@@ -1,24 +1,27 @@
+import { Link } from "react-router-dom";
 import { signOut } from "../services/auth";
 
 export default function Navbar() {
     return (
-        <div
-            style={{
-                height: 56,
-                background: "#0f172a",
-                color: "white",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                padding: "0 20px"
-            }}
-        >
-            <div>
-                <Link to="/" style={{ color: "white", textDecoration: "none", marginRight: 15 }}>Dashboard</Link>
-                <Link to="/activity" style={{ color: "white", textDecoration: "none", marginRight: 15 }}>Activity</Link>
-                <Link to="/analytics" style={{ color: "white", textDecoration: "none", marginRight: 15 }}>Analytics</Link>
+        <nav className="bg-blue-600 text-white shadow-md">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="flex items-center justify-between h-16">
+                    <div className="flex items-center space-x-8">
+                        <Link to="/" className="text-xl font-bold tracking-tight">KanbanX</Link>
+                        <div className="flex space-x-4 text-sm font-medium">
+                            <Link to="/" className="hover:bg-blue-700 px-3 py-2 rounded-md transition-colors">Dashboard</Link>
+                            <Link to="/activity" className="hover:bg-blue-700 px-3 py-2 rounded-md transition-colors">Activity</Link>
+                            <Link to="/analytics" className="hover:bg-blue-700 px-3 py-2 rounded-md transition-colors">Analytics</Link>
+                        </div>
+                    </div>
+                    <button
+                        onClick={signOut}
+                        className="bg-blue-700 hover:bg-blue-800 px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                    >
+                        Logout
+                    </button>
+                </div>
             </div>
-            <button onClick={signOut}>Logout</button>
-        </div>
+        </nav>
     );
 }
