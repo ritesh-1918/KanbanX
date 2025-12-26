@@ -6,6 +6,7 @@ import ListColumn from "../components/ListColumn";
 import { DragDropContext, Droppable } from "@hello-pangea/dnd";
 import ActivityPanel from "../components/ActivityPanel";
 import { logActivity } from "../services/activity";
+import { Toaster, toast } from "react-hot-toast";
 
 export default function BoardPage() {
     const { id } = useParams();
@@ -112,17 +113,44 @@ export default function BoardPage() {
         fetchData();
     }
 
+    const updateCard = async (cardId, updates) => {
+        // Optimistic Update
+        const previousCards = [...cards];
+        const updatedCards = cards.map(c => c.id === cardId ? { ...c, ...updates } : c);
+        setCards(updatedCards);
+
+        try {
+            const { error } = await supabase
+                .from("cards")
+                .update(updates)
+                .eq("id", cardId);
+
+            if (error) throw error;
+        } catch (error) {
+            // Rollback
+            setCards(previousCards);
+            toast.error("Failed to update card");
+            console.error(error);
+        }
+    };
+
     const deleteCard = async (cardId) => {
-        await supabase.from("cards").delete().eq("id", cardId);
+        const previousCards = [...cards];
+        setCards(cards.filter(c => c.id !== cardId)); // Optimistic delete
 
-        await logActivity({
-            boardId: id,
-            action: "Deleted card",
-            entityType: "card",
-            entityId: cardId,
-        });
+        try {
+            await supabase.from("cards").delete().eq("id", cardId);
 
-        fetchData();
+            await logActivity({
+                boardId: id,
+                action: "Deleted card",
+                entityType: "card",
+                entityId: cardId,
+            });
+        } catch (error) {
+            setCards(previousCards);
+            toast.error("Failed to delete card");
+        }
     }
 
     const onDragEnd = async (result) => {
@@ -137,6 +165,10 @@ export default function BoardPage() {
             return;
         }
 
+        // Capture previous state for rollback
+        const previousLists = [...lists];
+        const previousCards = [...cards];
+
         // Handle List Reordering
         if (type === "LIST") {
             const newLists = Array.from(lists);
@@ -145,15 +177,20 @@ export default function BoardPage() {
 
             setLists(newLists); // Optimistic
 
-            // Persist
-            const updates = newLists.map((l, index) => ({
-                id: l.id,
-                position: index,
-                board_id: id
-            }));
+            try {
+                // Persist
+                const updates = newLists.map((l, index) => ({
+                    id: l.id,
+                    position: index,
+                    board_id: id
+                }));
 
-            for (const u of updates) {
-                await supabase.from("lists").update({ position: u.position }).eq("id", u.id);
+                for (const u of updates) {
+                    await supabase.from("lists").update({ position: u.position }).eq("id", u.id);
+                }
+            } catch (error) {
+                setLists(previousLists);
+                toast.error("Failed to reorder lists");
             }
             return;
         }
@@ -164,10 +201,6 @@ export default function BoardPage() {
         // Find the moved card object
         const movedCard = newCards.find(c => c.id === draggableId);
         if (!movedCard) return; // Should not happen
-
-        // Remove from source
-        // We need to act on the specific subsets of cards to determine indices correctly relative to the list
-        // BUT, the source.index and destination.index from dnd are relative to the droppable (the list).
 
         const sourceListId = source.droppableId;
         const destListId = destination.droppableId;
@@ -186,65 +219,64 @@ export default function BoardPage() {
         // Insert into destination array
         destCards.splice(destination.index, 0, updatedMovedCard);
 
-        // Reconstruct the master cards array
-        // We filter out all cards from source and dest lists from the master list, then add back the updated arrays.
-        // If source == dest, we just do it once.
-
+        // Reconstruct
         let otherCards = newCards.filter(c => c.list_id !== sourceListId && c.list_id !== destListId);
 
         let finalCards;
         if (sourceListId === destListId) {
-            // Update positions
             sourceCards.forEach((c, i) => c.position = i);
             finalCards = [...otherCards, ...sourceCards];
-
-            // Optimistic
-            setCards(finalCards);
-
-            // Persist
-            for (const c of sourceCards) {
-                await supabase.from("cards").update({ position: c.position }).eq("id", c.id);
-            }
-
-            // Log move (same list)
-            if (sourceListId === destListId && source.index !== destination.index) {
-                await logActivity({
-                    boardId: id,
-                    action: "Reordered card",
-                    entityType: "card",
-                    entityId: movedCard.id,
-                    metadata: { itemName: movedCard.title }
-                });
-            }
-
         } else {
-            // Update positions for both lists
             sourceCards.forEach((c, i) => c.position = i);
             destCards.forEach((c, i) => c.position = i);
-
             finalCards = [...otherCards, ...sourceCards, ...destCards];
+        }
 
-            // Optimistic
-            setCards(finalCards);
+        // Apply Optimistic Update
+        setCards(finalCards);
 
-            // Persist source list changes (mostly removals/reordering)
-            for (const c of sourceCards) {
-                await supabase.from("cards").update({ position: c.position }).eq("id", c.id);
+        try {
+            if (sourceListId === destListId) {
+                // Persist
+                for (const c of sourceCards) {
+                    await supabase.from("cards").update({ position: c.position }).eq("id", c.id);
+                }
+
+                // Log move (same list)
+                if (source.index !== destination.index) {
+                    await logActivity({
+                        boardId: id,
+                        action: "Reordered card",
+                        entityType: "card",
+                        entityId: movedCard.id,
+                        metadata: { itemName: movedCard.title }
+                    });
+                }
+
+            } else {
+                // Persist source list changes
+                for (const c of sourceCards) {
+                    await supabase.from("cards").update({ position: c.position }).eq("id", c.id);
+                }
+                // Persist dest list changes
+                for (const c of destCards) {
+                    await supabase.from("cards").update({ position: c.position, list_id: destListId }).eq("id", c.id);
+                }
+
+                // Log move (cross list)
+                const destListName = lists.find(l => l.id === destListId)?.title || "unknown list";
+                await logActivity({
+                    boardId: id,
+                    action: "Moved card",
+                    entityType: "card",
+                    entityId: movedCard.id,
+                    metadata: { itemName: movedCard.title, toColumn: destListName }
+                });
             }
-            // Persist dest list changes (additions/reordering + list_id change for moved card)
-            for (const c of destCards) {
-                await supabase.from("cards").update({ position: c.position, list_id: destListId }).eq("id", c.id);
-            }
-
-            // Log move (cross list)
-            const destListName = lists.find(l => l.id === destListId)?.title || "unknown list";
-            await logActivity({
-                boardId: id,
-                action: "Moved card",
-                entityType: "card",
-                entityId: movedCard.id,
-                metadata: { itemName: movedCard.title, toColumn: destListName }
-            });
+        } catch (error) {
+            console.error(error);
+            setCards(previousCards);
+            toast.error("Failed to move card");
         }
     };
 
@@ -292,16 +324,16 @@ export default function BoardPage() {
                                 {...provided.droppableProps}
                                 style={{ display: "flex", gap: 16, marginTop: 20, alignItems: 'flex-start' }}
                             >
-                                {lists.map((list, index) => (
-                                    <ListColumn
-                                        key={list.id}
-                                        list={list}
-                                        index={index}
-                                        cards={cards.filter(c => c.list_id === list.id).sort((a, b) => a.position - b.position)}
-                                        onCreateCard={createCard}
-                                        onDeleteCard={deleteCard}
-                                    />
-                                ))}
+                                {lists.map((list, index) => <ListColumn
+                                    key={list.id}
+                                    list={list}
+                                    index={index}
+                                    cards={cards.filter(c => c.list_id === list.id).sort((a, b) => a.position - b.position)}
+                                    onCreateCard={createCard}
+                                    onDeleteCard={deleteCard}
+                                    onUpdateCard={updateCard}
+                                />
+                                )}
                                 {provided.placeholder}
                             </div>
                         )}
@@ -309,6 +341,7 @@ export default function BoardPage() {
                 </DragDropContext>
 
                 <ActivityPanel boardId={id} />
+                <Toaster position="bottom-right" />
             </div>
         </>
     );

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import CardModal from "./CardModal";
 
-export default function ListColumn({ list, index, cards, onCreateCard, onDeleteCard, readOnly = false }) {
+export default function ListColumn({ list, index, cards, onCreateCard, onDeleteCard, onUpdateCard, readOnly = false }) {
     const [text, setText] = useState("");
     const [activeCard, setActiveCard] = useState(null);
 
@@ -109,7 +109,12 @@ export default function ListColumn({ list, index, cards, onCreateCard, onDeleteC
                 )}
             </Draggable>
 
-            <CardModal card={activeCard} onClose={() => setActiveCard(null)} readOnly={readOnly} />
+            <CardModal
+                card={activeCard}
+                onClose={() => setActiveCard(null)}
+                readOnly={readOnly}
+                onUpdateCard={onUpdateCard}
+            />
         </>
     );
 }
