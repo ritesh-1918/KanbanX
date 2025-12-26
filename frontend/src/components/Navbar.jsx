@@ -16,6 +16,7 @@ export default function Navbar() {
             <div>
                 <Link to="/" style={{ color: "white", textDecoration: "none", marginRight: 15 }}>Dashboard</Link>
                 <Link to="/activity" style={{ color: "white", textDecoration: "none", marginRight: 15 }}>Activity</Link>
+                <Link to="/analytics" style={{ color: "white", textDecoration: "none", marginRight: 15 }}>Analytics</Link>
             </div>
             <button onClick={signOut}>Logout</button>
         </div>
