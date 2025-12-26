@@ -4,6 +4,8 @@ import Navbar from "../components/Navbar";
 import { supabase } from "../lib/supabase";
 import ListColumn from "../components/ListColumn";
 import { DragDropContext, Droppable } from "@hello-pangea/dnd";
+import ActivityPanel from "../components/ActivityPanel";
+import { logActivity } from "../services/activity";
 
 export default function BoardPage() {
     const { id } = useParams();
@@ -64,25 +66,48 @@ export default function BoardPage() {
             title,
             position: lists.length
         });
+
+        await logActivity({
+            boardId: id,
+            action: "Created list",
+            entityType: "list",
+            entityId: null, // we don't have the ID easily unless we select it back, okay to skip for now or fetch
+            metadata: { itemName: title }
+        });
+
         setTitle("");
         fetchData();
     };
 
     const createCard = async (listId, cardTitle) => {
-        // Optimistic update or just refetch. Using refetch for simplicity as per previous pattern, 
-        // but ideally we should update local state.
-        // We'll calculate position based on local state for that list.
-        const listCards = cards.filter(c => c.list_id === listId);
         await supabase.from("cards").insert({
             list_id: listId,
             title: cardTitle,
-            position: listCards.length
+            position: 1000, // naive position for now
+            board_id: id // Ensure board_id is saved on card for easier access later
         });
+
+        await logActivity({
+            boardId: id,
+            action: "Created card",
+            entityType: "card",
+            entityId: null,
+            metadata: { itemName: cardTitle }
+        });
+
         fetchData();
     }
 
     const deleteCard = async (cardId) => {
         await supabase.from("cards").delete().eq("id", cardId);
+
+        await logActivity({
+            boardId: id,
+            action: "Deleted card",
+            entityType: "card",
+            entityId: cardId,
+        });
+
         fetchData();
     }
 
@@ -167,6 +192,17 @@ export default function BoardPage() {
                 await supabase.from("cards").update({ position: c.position }).eq("id", c.id);
             }
 
+            // Log move (same list)
+            if (sourceListId === destListId && source.index !== destination.index) {
+                await logActivity({
+                    boardId: id,
+                    action: "Reordered card",
+                    entityType: "card",
+                    entityId: movedCard.id,
+                    metadata: { itemName: movedCard.title }
+                });
+            }
+
         } else {
             // Update positions for both lists
             sourceCards.forEach((c, i) => c.position = i);
@@ -185,6 +221,16 @@ export default function BoardPage() {
             for (const c of destCards) {
                 await supabase.from("cards").update({ position: c.position, list_id: destListId }).eq("id", c.id);
             }
+
+            // Log move (cross list)
+            const destListName = lists.find(l => l.id === destListId)?.title || "unknown list";
+            await logActivity({
+                boardId: id,
+                action: "Moved card",
+                entityType: "card",
+                entityId: movedCard.id,
+                metadata: { itemName: movedCard.title, toColumn: destListName }
+            });
         }
     };
 
@@ -224,6 +270,8 @@ export default function BoardPage() {
                         )}
                     </Droppable>
                 </DragDropContext>
+
+                <ActivityPanel boardId={id} />
             </div>
         </>
     );

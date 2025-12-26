@@ -1,4 +1,6 @@
 import { supabase } from "../lib/supabase";
+import { logActivity } from "../services/activity";
+
 
 export default function CardModal({ card, onClose }) {
     if (!card) return null;
@@ -30,10 +32,19 @@ export default function CardModal({ card, onClose }) {
                     style={{ width: "100%", height: 120, marginTop: 10, padding: 8 }}
                     placeholder="Add a more detailed description..."
                     onBlur={async (e) => {
+                        if (e.target.value === card.description) return;
                         await supabase
                             .from("cards")
                             .update({ description: e.target.value })
                             .eq("id", card.id);
+
+                        await logActivity({
+                            boardId: card.board_id, // IMPORTANT: We need board_id on the card object for this to work.
+                            action: "Updated card description",
+                            entityType: "card",
+                            entityId: card.id,
+                            metadata: { itemName: card.title }
+                        });
                     }}
                 />
                 <button onClick={onClose} style={{ marginTop: 10 }}>
