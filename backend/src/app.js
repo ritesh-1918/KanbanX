@@ -1,2 +1,2 @@
-// App entry point
+// app.js - Application logic placeholder
 module.exports = {};
