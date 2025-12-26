@@ -7,6 +7,7 @@ import { DragDropContext, Droppable } from "@hello-pangea/dnd";
 import ActivityPanel from "../components/ActivityPanel";
 import { logActivity } from "../services/activity";
 import { Toaster, toast } from "react-hot-toast";
+import { getBoardRole, inviteMember } from "../services/members";
 
 export default function BoardPage() {
     const { id } = useParams();
@@ -15,8 +16,16 @@ export default function BoardPage() {
     const [title, setTitle] = useState("");
     const [isPublic, setIsPublic] = useState(false);
     const [shareId, setShareId] = useState(null);
+    const [role, setRole] = useState(null);
+    const [isInviteOpen, setIsInviteOpen] = useState(false);
+
+    const isReadOnly = role === "VIEWER" || (!role && isPublic); // If public but no role, it's viewer (though SharedBoardPage handles that usually, this is for direct access if enabled)
 
     const fetchData = async () => {
+        // Fetch Role
+        const userRole = await getBoardRole(id);
+        setRole(userRole);
+
         // Fetch lists
         const { data: listsData } = await supabase
             .from("lists")
@@ -24,7 +33,7 @@ export default function BoardPage() {
             .eq("board_id", id)
             .order("position");
 
-        // Fetch board details for sharing info
+        // Fetch board details
         const { data: boardData } = await supabase
             .from("boards")
             .select("is_public, share_id")
@@ -38,7 +47,7 @@ export default function BoardPage() {
 
         setLists(listsData || []);
 
-        // Fetch all cards for this board's lists
+        // Fetch all cards
         if (listsData?.length > 0) {
             const listIds = listsData.map(l => l.id);
             const { data: cardsData } = await supabase
@@ -290,49 +299,99 @@ export default function BoardPage() {
         if (!error) setIsPublic(newValue);
     };
 
+    const handleInvite = async (e) => {
+        e.preventDefault();
+        const email = e.target.email.value;
+        const role = e.target.role.value;
+        try {
+            await inviteMember(id, email, role);
+            toast.success("Invited successfully!");
+            setIsInviteOpen(false);
+        } catch (err) {
+            toast.error(err.message);
+        }
+    };
+
     return (
         <>
             <Navbar />
             <div style={{ padding: 16 }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                    <div style={{ display: "flex", gap: 8 }}>
-                        <input
-                            placeholder="New list title"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                        />
-                        <button onClick={createList}>Add List</button>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        {/* Only Owners/Editors can add lists */}
+                        {!isReadOnly && (
+                            <>
+                                <input
+                                    placeholder="New list title"
+                                    value={title}
+                                    onChange={(e) => setTitle(e.target.value)}
+                                />
+                                <button onClick={createList}>Add List</button>
+                            </>
+                        )}
                     </div>
 
                     <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                        {isPublic && (
-                            <span style={{ fontSize: 12, background: "#e2e8f0", padding: "4px 8px", borderRadius: 4 }}>
-                                Public Link: <a href={`/share/${shareId}`} target="_blank" rel="noreferrer">/share/{shareId?.slice(0, 8)}...</a>
+                        {role && (
+                            <span style={{ fontSize: 12, background: "#dbeafe", padding: "4px 8px", borderRadius: 4, color: "#1e40af", fontWeight: "bold" }}>
+                                {role}
                             </span>
                         )}
-                        <button onClick={handleShareToggle} style={{ background: isPublic ? "#dc2626" : "#2563eb" }}>
-                            {isPublic ? "Unshare Board" : "Share Board"}
-                        </button>
+
+                        {role === "OWNER" && (
+                            <>
+                                <button onClick={() => setIsInviteOpen(true)} style={{ background: "#8b5cf6" }}>
+                                    Invite
+                                </button>
+                                {isPublic && (
+                                    <span style={{ fontSize: 12, background: "#e2e8f0", padding: "4px 8px", borderRadius: 4 }}>
+                                        Public Link: <a href={`/share/${shareId}`} target="_blank" rel="noreferrer">/share/{shareId?.slice(0, 8)}...</a>
+                                    </span>
+                                )}
+                                <button onClick={handleShareToggle} style={{ background: isPublic ? "#dc2626" : "#2563eb" }}>
+                                    {isPublic ? "Unshare Board" : "Share Board"}
+                                </button>
+                            </>
+                        )}
                     </div>
                 </div>
 
+                {isInviteOpen && (
+                    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "grid", placeItems: "center", zIndex: 100 }} onClick={() => setIsInviteOpen(false)}>
+                        <div style={{ background: "white", padding: 20, borderRadius: 8, minWidth: 300 }} onClick={e => e.stopPropagation()}>
+                            <h3>Invite Member</h3>
+                            <form onSubmit={handleInvite} style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 10 }}>
+                                <input name="email" placeholder="User Email" required style={{ padding: 8 }} />
+                                <select name="role" style={{ padding: 8 }}>
+                                    <option value="VIEWER">Viewer</option>
+                                    <option value="EDITOR">Editor</option>
+                                    <option value="OWNER">Owner</option>
+                                </select>
+                                <button type="submit">Send Invite</button>
+                            </form>
+                        </div>
+                    </div>
+                )}
+
                 <DragDropContext onDragEnd={onDragEnd}>
-                    <Droppable droppableId="board-lists" direction="horizontal" type="LIST">
+                    <Droppable droppableId="board-lists" direction="horizontal" type="LIST" isDropDisabled={isReadOnly}>
                         {(provided) => (
                             <div
                                 ref={provided.innerRef}
                                 {...provided.droppableProps}
                                 style={{ display: "flex", gap: 16, marginTop: 20, alignItems: 'flex-start' }}
                             >
-                                {lists.map((list, index) => <ListColumn
-                                    key={list.id}
-                                    list={list}
-                                    index={index}
-                                    cards={cards.filter(c => c.list_id === list.id).sort((a, b) => a.position - b.position)}
-                                    onCreateCard={createCard}
-                                    onDeleteCard={deleteCard}
-                                    onUpdateCard={updateCard}
-                                />
+                                {lists.map((list, index) =>
+                                    <ListColumn
+                                        key={list.id}
+                                        list={list}
+                                        index={index}
+                                        cards={cards.filter(c => c.list_id === list.id).sort((a, b) => a.position - b.position)}
+                                        onCreateCard={createCard}
+                                        onDeleteCard={deleteCard}
+                                        onUpdateCard={updateCard}
+                                        readOnly={isReadOnly}
+                                    />
                                 )}
                                 {provided.placeholder}
                             </div>
