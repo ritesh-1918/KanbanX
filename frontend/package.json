@@ -12,6 +12,7 @@
     "dependencies": {
         "@dnd-kit/core": "^6.0.8",
         "@dnd-kit/sortable": "^7.0.2",
+        "@hello-pangea/dnd": "^18.0.1",
         "@supabase/supabase-js": "^2.89.0",
         "axios": "^1.4.0",
         "react": "^18.2.0",
