@@ -37,6 +37,24 @@ export default function BoardPage() {
 
     useEffect(() => {
         fetchData();
+
+        const channel = supabase
+            .channel("kanban-realtime")
+            .on(
+                "postgres_changes",
+                { event: "*", schema: "public", table: "lists" },
+                () => fetchData()
+            )
+            .on(
+                "postgres_changes",
+                { event: "*", schema: "public", table: "cards" },
+                () => fetchData()
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [id]);
 
     const createList = async () => {
