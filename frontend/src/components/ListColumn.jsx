@@ -2,11 +2,12 @@ import { useState } from "react";
 import { Droppable, Draggable } from "@hello-pangea/dnd";
 import CardModal from "./CardModal";
 
-export default function ListColumn({ list, index, cards, onCreateCard, onDeleteCard }) {
+export default function ListColumn({ list, index, cards, onCreateCard, onDeleteCard, readOnly = false }) {
     const [text, setText] = useState("");
     const [activeCard, setActiveCard] = useState(null);
 
     const handleAddCard = async () => {
+        if (readOnly) return;
         if (!text.trim()) return;
         await onCreateCard(list.id, text);
         setText("");
@@ -14,7 +15,7 @@ export default function ListColumn({ list, index, cards, onCreateCard, onDeleteC
 
     return (
         <>
-            <Draggable draggableId={list.id} index={index}>
+            <Draggable draggableId={list.id} index={index} isDragDisabled={readOnly}>
                 {(provided) => (
                     <div
                         ref={provided.innerRef}
@@ -27,11 +28,11 @@ export default function ListColumn({ list, index, cards, onCreateCard, onDeleteC
                             ...provided.draggableProps.style
                         }}
                     >
-                        <div {...provided.dragHandleProps} style={{ marginBottom: 10, cursor: "grab" }}>
+                        <div {...provided.dragHandleProps} style={{ marginBottom: 10, cursor: readOnly ? "default" : "grab" }}>
                             <strong>{list.title}</strong>
                         </div>
 
-                        <Droppable droppableId={list.id} type="CARD">
+                        <Droppable droppableId={list.id} type="CARD" isDropDisabled={readOnly}>
                             {(provided) => (
                                 <div
                                     ref={provided.innerRef}
@@ -39,7 +40,7 @@ export default function ListColumn({ list, index, cards, onCreateCard, onDeleteC
                                     style={{ minHeight: 20, display: "grid", gap: 8 }}
                                 >
                                     {cards.map((card, idx) => (
-                                        <Draggable draggableId={card.id} index={idx} key={card.id}>
+                                        <Draggable draggableId={card.id} index={idx} key={card.id} isDragDisabled={readOnly}>
                                             {(provided, snapshot) => (
                                                 <div
                                                     ref={provided.innerRef}
@@ -54,7 +55,7 @@ export default function ListColumn({ list, index, cards, onCreateCard, onDeleteC
                                                         boxShadow: snapshot.isDragging
                                                             ? "0 5px 10px rgba(0,0,0,0.15)"
                                                             : "0 1px 3px rgba(0,0,0,0.1)",
-                                                        cursor: "grab",
+                                                        cursor: readOnly ? "default" : "grab",
                                                         ...provided.draggableProps.style
                                                     }}
                                                 >
@@ -64,22 +65,24 @@ export default function ListColumn({ list, index, cards, onCreateCard, onDeleteC
                                                     >
                                                         {card.title}
                                                     </span>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation(); // Prevent drag start and modal open
-                                                            onDeleteCard(card.id);
-                                                        }}
-                                                        style={{
-                                                            cursor: 'pointer',
-                                                            border: 'none',
-                                                            background: 'transparent',
-                                                            color: '#dc2626',
-                                                            fontWeight: 'bold',
-                                                            marginLeft: 8
-                                                        }}
-                                                    >
-                                                        ×
-                                                    </button>
+                                                    {!readOnly && (
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                onDeleteCard(card.id);
+                                                            }}
+                                                            style={{
+                                                                cursor: 'pointer',
+                                                                border: 'none',
+                                                                background: 'transparent',
+                                                                color: '#dc2626',
+                                                                fontWeight: 'bold',
+                                                                marginLeft: 8
+                                                            }}
+                                                        >
+                                                            ×
+                                                        </button>
+                                                    )}
                                                 </div>
                                             )}
                                         </Draggable>
@@ -89,20 +92,24 @@ export default function ListColumn({ list, index, cards, onCreateCard, onDeleteC
                             )}
                         </Droppable>
 
-                        <input
-                            placeholder="New card"
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                            style={{ marginTop: 8, width: "100%", padding: 4 }}
-                        />
-                        <button onClick={handleAddCard} style={{ marginTop: 6, width: "100%" }}>
-                            Add Card
-                        </button>
+                        {!readOnly && (
+                            <>
+                                <input
+                                    placeholder="New card"
+                                    value={text}
+                                    onChange={(e) => setText(e.target.value)}
+                                    style={{ marginTop: 8, width: "100%", padding: 4 }}
+                                />
+                                <button onClick={handleAddCard} style={{ marginTop: 6, width: "100%" }}>
+                                    Add Card
+                                </button>
+                            </>
+                        )}
                     </div>
                 )}
             </Draggable>
 
-            <CardModal card={activeCard} onClose={() => setActiveCard(null)} />
+            <CardModal card={activeCard} onClose={() => setActiveCard(null)} readOnly={readOnly} />
         </>
     );
 }

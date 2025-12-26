@@ -5,6 +5,7 @@ import App from "./App"; // Import App if needed or remove depending on structur
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import BoardPage from "./pages/BoardPage";
+import SharedBoardPage from "./pages/SharedBoardPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./styles/index.css";
 
@@ -12,6 +13,7 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <BrowserRouter>
         <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/share/:shareId" element={<SharedBoardPage />} />
             <Route
                 path="/"
                 element={

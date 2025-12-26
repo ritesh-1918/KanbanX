@@ -12,6 +12,8 @@ export default function BoardPage() {
     const [lists, setLists] = useState([]);
     const [cards, setCards] = useState([]); // Lifted cards state
     const [title, setTitle] = useState("");
+    const [isPublic, setIsPublic] = useState(false);
+    const [shareId, setShareId] = useState(null);
 
     const fetchData = async () => {
         // Fetch lists
@@ -20,6 +22,18 @@ export default function BoardPage() {
             .select("*")
             .eq("board_id", id)
             .order("position");
+
+        // Fetch board details for sharing info
+        const { data: boardData } = await supabase
+            .from("boards")
+            .select("is_public, share_id")
+            .eq("id", id)
+            .single();
+
+        if (boardData) {
+            setIsPublic(boardData.is_public);
+            setShareId(boardData.share_id);
+        }
 
         setLists(listsData || []);
 
@@ -234,17 +248,40 @@ export default function BoardPage() {
         }
     };
 
+    const handleShareToggle = async () => {
+        const newValue = !isPublic;
+        const { error } = await supabase
+            .from("boards")
+            .update({ is_public: newValue })
+            .eq("id", id);
+
+        if (!error) setIsPublic(newValue);
+    };
+
     return (
         <>
             <Navbar />
             <div style={{ padding: 16 }}>
-                <div style={{ display: "flex", gap: 8 }}>
-                    <input
-                        placeholder="New list title"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                    />
-                    <button onClick={createList}>Add List</button>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        <input
+                            placeholder="New list title"
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                        />
+                        <button onClick={createList}>Add List</button>
+                    </div>
+
+                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                        {isPublic && (
+                            <span style={{ fontSize: 12, background: "#e2e8f0", padding: "4px 8px", borderRadius: 4 }}>
+                                Public Link: <a href={`/share/${shareId}`} target="_blank" rel="noreferrer">/share/{shareId?.slice(0, 8)}...</a>
+                            </span>
+                        )}
+                        <button onClick={handleShareToggle} style={{ background: isPublic ? "#dc2626" : "#2563eb" }}>
+                            {isPublic ? "Unshare Board" : "Share Board"}
+                        </button>
+                    </div>
                 </div>
 
                 <DragDropContext onDragEnd={onDragEnd}>
