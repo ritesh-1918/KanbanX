@@ -1,3 +1,5 @@
+import { Link } from "react-router-dom";
+
 export default function BoardCard({ board, onDelete }) {
     return (
         <div
@@ -11,7 +13,9 @@ export default function BoardCard({ board, onDelete }) {
                 alignItems: "center"
             }}
         >
-            <strong>{board.title}</strong>
+            <strong>
+                <Link to={`/board/${board.id}`}>{board.title}</Link>
+            </strong>
             <button onClick={() => onDelete(board.id)}>Delete</button>
         </div>
     );
