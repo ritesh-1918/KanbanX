@@ -6,6 +6,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import BoardPage from "./pages/BoardPage";
 import SharedBoardPage from "./pages/SharedBoardPage";
+import ActivityPage from "./pages/ActivityPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import "./styles/index.css";
 
@@ -27,6 +28,14 @@ ReactDOM.createRoot(document.getElementById("root")).render(
                 element={
                     <ProtectedRoute>
                         <BoardPage />
+                    </ProtectedRoute>
+                }
+            />
+            <Route
+                path="/activity"
+                element={
+                    <ProtectedRoute>
+                        <ActivityPage />
                     </ProtectedRoute>
                 }
             />

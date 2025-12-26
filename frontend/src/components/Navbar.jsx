@@ -13,7 +13,10 @@ export default function Navbar() {
                 padding: "0 20px"
             }}
         >
-            <strong>KanbanX</strong>
+            <div>
+                <Link to="/" style={{ color: "white", textDecoration: "none", marginRight: 15 }}>Dashboard</Link>
+                <Link to="/activity" style={{ color: "white", textDecoration: "none", marginRight: 15 }}>Activity</Link>
+            </div>
             <button onClick={signOut}>Logout</button>
         </div>
     );

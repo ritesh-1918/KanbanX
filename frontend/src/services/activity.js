@@ -27,3 +27,17 @@ export const getBoardActivity = async (boardId) => {
     if (error) throw error;
     return data;
 };
+
+export const getAllActivity = async () => {
+    const { data, error } = await supabase
+        .from("activity_logs")
+        .select(`
+            *,
+            boards ( title )
+        `)
+        .order("created_at", { ascending: false })
+        .limit(100);
+
+    if (error) throw error;
+    return data;
+};
